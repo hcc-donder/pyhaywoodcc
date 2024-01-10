@@ -1,0 +1,25 @@
+[project]
+name = "pyhaywoodcc"
+version = "0.1.0"
+authors = [
+    { name = "David Onder", email = "donder@haywood.edu" }
+]
+description = "A module of tools used by HCC staff"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "connectorx",
+    "duckdb",
+    "pandas",
+    "polars",
+    "pycolleague" # = {ref = "main", git = "git+https://github.com/Haywood-Community-College-IERG/pycolleague.git"}
+]
+license = {file = "license.txt"}
+
+[project.urls]
+Homepage = "https://github.com/hcc-donder/pyhaywoodcc"
+Issues = "https://github.com/hcc-donder/pyhaywoodcc/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
