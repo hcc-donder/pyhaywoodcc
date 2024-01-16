@@ -6,3 +6,5 @@ from .ipeds import (
     term_enrollment,
 )
 from .utils import commas_to_mv, delim_to_mv, load_config, mv_to_commas, mv_to_delim
+
+__version__ = "0.2.1"

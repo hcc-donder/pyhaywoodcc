@@ -1,6 +1,9 @@
 import os.path
+import pkgutil
+# import sys
 from copy import deepcopy
-from typing import Dict, List, Union
+from io import BytesIO
+from typing import List, Union
 
 import duckdb as ddb
 import pandas as pd
@@ -19,6 +22,54 @@ from pycolleague import ColleagueConnection
 # Need to do this because we need to override the default values for df_format and lazy.
 class LocalConnection(ColleagueConnection):
     pass
+
+
+def load_data(
+    dataset: str = "",
+    format: str = "pandas",
+    lazy: bool = False,
+) -> List[Union[Union[pl.DataFrame, pl.LazyFrame], Union[pl.DataFrame, pl.LazyFrame]]]:
+    """
+    Loads the data from the package into a pandas dataframe
+    """
+    # Get the path to the data file
+
+    if format == "pandas":
+        lazy = False
+
+    # Check if dataset is a valid selection
+    if dataset not in [
+        "ccp_programs",
+        "early_college_programs",
+        "haywood_county_high_schools",
+        "high_school_programs",
+    ]:
+        raise ValueError(
+            "dataset must be one of ccp_programs, early_college_programs, haywood_county_high_schools, or high_school_programs"
+        )
+
+    if __name__ == "__main__":
+        d = "src/pyhaywoodcc"
+        data = pl.read_csv(BytesIO(open(f"{d}/data/{dataset}.csv", "rb").read()))
+    else:
+        data = pl.read_csv(
+            BytesIO(
+                pkgutil.get_data(__package__, f"data/{dataset}.csv")
+            )
+        )
+
+    if format == "pandas":
+        # We need to return a pandas dataframe
+        data = data.to_pandas()
+
+    else:  # format is polars
+        # Since the return format is polars, we just need to check the lazy flag
+
+        # If the return connection is lazy...
+        if lazy:
+            data = data.lazy()
+
+    return data
 
 
 # Get the terms and report_terms data frames
@@ -103,6 +154,19 @@ def term_enrollment(
     report_years: Union[int, List[int], None] = None,
     report_semesters: Union[str, List[str], None] = None,
 ) -> Union[pd.DataFrame, pl.DataFrame, pl.LazyFrame]:
+    """
+    Return enrollment for specified term as of the IPEDS reporting date of October 15
+
+    All data comes from CCDW_HIST SQL Server database
+
+    Args:
+        conn: A ColleagueConnection object
+        report_years: The list of years to include in the data. If unspecified, all years are returned.
+        report_semesters: Either a single semester abbreviation or a list of semester abbreviations. If unspecified, all semesters are returned.
+
+    Returns:
+        A pandas or polars dataframe of the data
+    """
     source: str = conn.source
     df_format: str = conn.df_format
     lazy: bool = conn.lazy
@@ -803,6 +867,10 @@ if __name__ == "__main__":
         format="polars",
         lazy=True,
     )
+
+    df = load_data("ccp_programs", "pandas")
+    df = load_data("ccp_programs", "polars")
+    df = load_data("ccp_programs", "polars", True)
 
     total_start_time = time.time()
 

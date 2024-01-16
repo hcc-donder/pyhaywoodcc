@@ -161,3 +161,4 @@ cython_debug/
 config.yml.ORIG
 file_*.csv
 data/high_school_programs.r
+*.SAV

@@ -1,6 +1,5 @@
 [project]
 name = "pyhaywoodcc"
-version = "0.1.0"
 authors = [
     { name = "David Onder", email = "donder@haywood.edu" }
 ]
@@ -15,6 +14,7 @@ dependencies = [
     "pycolleague" # = {ref = "main", git = "git+https://github.com/Haywood-Community-College-IERG/pycolleague.git"}
 ]
 license = {file = "license.txt"}
+dynamic = ["version"]
 
 [project.urls]
 Homepage = "https://github.com/hcc-donder/pyhaywoodcc"
@@ -23,3 +23,13 @@ Issues = "https://github.com/hcc-donder/pyhaywoodcc/issues"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/pyhaywoodcc/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+only-include = ["src/pyhaywoodcc", "data/*.csv"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src" = ""
+"data" = "data/*.csv"

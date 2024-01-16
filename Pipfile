@@ -16,6 +16,7 @@ pycolleague = {ref = "main", git = "git+https://github.com/Haywood-Community-Col
 pylint = "*"
 ipykernel = "*"
 build = "*"
+hatch = "*"
 
 [requires]
 python_version = "3.11"
