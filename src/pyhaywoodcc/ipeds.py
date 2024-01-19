@@ -1,8 +1,6 @@
 import os.path
-import pkgutil
+
 # import sys
-from copy import deepcopy
-from io import BytesIO
 from typing import List, Union
 
 import duckdb as ddb
@@ -24,54 +22,6 @@ class LocalConnection(ColleagueConnection):
     pass
 
 
-def load_data(
-    dataset: str = "",
-    format: str = "pandas",
-    lazy: bool = False,
-) -> List[Union[Union[pl.DataFrame, pl.LazyFrame], Union[pl.DataFrame, pl.LazyFrame]]]:
-    """
-    Loads the data from the package into a pandas dataframe
-    """
-    # Get the path to the data file
-
-    if format == "pandas":
-        lazy = False
-
-    # Check if dataset is a valid selection
-    if dataset not in [
-        "ccp_programs",
-        "early_college_programs",
-        "haywood_county_high_schools",
-        "high_school_programs",
-    ]:
-        raise ValueError(
-            "dataset must be one of ccp_programs, early_college_programs, haywood_county_high_schools, or high_school_programs"
-        )
-
-    if __name__ == "__main__":
-        d = "src/pyhaywoodcc"
-        data = pl.read_csv(BytesIO(open(f"{d}/data/{dataset}.csv", "rb").read()))
-    else:
-        data = pl.read_csv(
-            BytesIO(
-                pkgutil.get_data(__package__, f"data/{dataset}.csv")
-            )
-        )
-
-    if format == "pandas":
-        # We need to return a pandas dataframe
-        data = data.to_pandas()
-
-    else:  # format is polars
-        # Since the return format is polars, we just need to check the lazy flag
-
-        # If the return connection is lazy...
-        if lazy:
-            data = data.lazy()
-
-    return data
-
-
 # Get the terms and report_terms data frames
 def get_terms(
     lconn: LocalConnection,
@@ -79,20 +29,22 @@ def get_terms(
     report_semesters: Union[str, List[str], None] = None,
 ) -> List[Union[Union[pl.DataFrame, pl.LazyFrame], Union[pl.DataFrame, pl.LazyFrame]]]:
     terms = (
-        lconn.get_data(
-            "Term_CU",
-            schema="dw_dim",
-            cols={
-                "Term_ID": "Term_ID",
-                "Term_Index": "Term_Index",
-                "Semester": "Term_Name",
-                "Term_Abbreviation": "Semester",
-                "Term_Start_Date": "Term_Start_Date",
-                "Term_Census_Date": "Term_Census_Date",
-                "Term_End_Date": "Term_End_Date",
-                "Reporting_Year_FSS": "Term_Reporting_Year",
-                "Reporting_Academic_Year_FSS": "Academic_Year",
-            },
+        pl.DataFrame(
+            lconn.get_data(
+                "Term_CU",
+                schema="dw_dim",
+                cols={
+                    "Term_ID": "Term_ID",
+                    "Term_Index": "Term_Index",
+                    "Semester": "Term_Name",
+                    "Term_Abbreviation": "Semester",
+                    "Term_Start_Date": "Term_Start_Date",
+                    "Term_Census_Date": "Term_Census_Date",
+                    "Term_End_Date": "Term_End_Date",
+                    "Reporting_Year_FSS": "Term_Reporting_Year",
+                    "Reporting_Academic_Year_FSS": "Academic_Year",
+                },
+            )
         )
         .cast(
             {
@@ -157,8 +109,6 @@ def term_enrollment(
     """
     Return enrollment for specified term as of the IPEDS reporting date of October 15
 
-    All data comes from CCDW_HIST SQL Server database
-
     Args:
         conn: A ColleagueConnection object
         report_years: The list of years to include in the data. If unspecified, all years are returned.
@@ -188,42 +138,46 @@ def term_enrollment(
 
     # Need to get section location for distance learning courses
     # Right now, just take most recent. Probably need to do this the same way as SAC below.
-    course_sections = lconn.get_data(
-        "COURSE_SECTIONS",
-        cols={
-            "COURSE.SECTIONS.ID": "Course_Section_ID",
-            "SEC.TERM": "Term_ID",
-            "SEC.LOCATION": "Section_Location",
-            "X.SEC.DELIVERY.METHOD": "Delivery_Method",
-            "X.SEC.DELIVERY.MODE": "Delivery_Mode",
-            # "X.SEC.DELIVERY.NCIH.FLAG" : "Delivery_NCIH_Flag",
-            # "X.SEC.DELIVERY/MODIFIER" : "Delivery_Modifier",
-        },
+    course_sections = pl.DataFrame(
+        lconn.get_data(
+            "COURSE_SECTIONS",
+            cols={
+                "COURSE.SECTIONS.ID": "Course_Section_ID",
+                "SEC.TERM": "Term_ID",
+                "SEC.LOCATION": "Section_Location",
+                "X.SEC.DELIVERY.METHOD": "Delivery_Method",
+                "X.SEC.DELIVERY.MODE": "Delivery_Mode",
+                # "X.SEC.DELIVERY.NCIH.FLAG" : "Delivery_NCIH_Flag",
+                # "X.SEC.DELIVERY/MODIFIER" : "Delivery_Modifier",
+            },
+        )
     )
 
     student_acad_cred = (
-        lconn.get_data(
-            "STUDENT_ACAD_CRED",
-            version="history",
-            cols={
-                "STC.PERSON.ID": "Person_ID",
-                "STC.TERM": "Term_ID",
-                "STUDENT.ACAD.CRED.ID": "Course_ID",
-                "STC.CRED": "Credit",
-                "STC.COURSE.LEVEL": "Course_Level",
-                "STC.VERIFIED.GRADE": "Grade_Code",
-                "STC.SECTION.NO": "Course_Section",
-                "STC.COURSE.SECTION": "Course_Section_ID",
-                "STC.STATUS": "Course_Status",
-                "EffectiveDatetime": "EffectiveDatetime",
-            },
-            where="""
+        pl.DataFrame(
+            lconn.get_data(
+                "STUDENT_ACAD_CRED",
+                version="history",
+                cols={
+                    "STC.PERSON.ID": "Person_ID",
+                    "STC.TERM": "Term_ID",
+                    "STUDENT.ACAD.CRED.ID": "Course_ID",
+                    "STC.CRED": "Credit",
+                    "STC.COURSE.LEVEL": "Course_Level",
+                    "STC.VERIFIED.GRADE": "Grade_Code",
+                    "STC.SECTION.NO": "Course_Section",
+                    "STC.COURSE.SECTION": "Course_Section_ID",
+                    "STC.STATUS": "Course_Status",
+                    "EffectiveDatetime": "EffectiveDatetime",
+                },
+                where="""
                     [STC.CRED] > 0
                     AND [STC.ACAD.LEVEL] == 'CU'
                     /*AND [STC.PERSON.ID] IN ['0078937','1151394']
                     AND [STC.TERM] IN ('2022FA')*/
                 """,
-            # debug="query",
+                # debug="query",
+            )
         )
         .cast(
             {
@@ -234,8 +188,10 @@ def term_enrollment(
             }
         )
         .join(
-            terms.select(
-                ["Term_ID", "Term_Reporting_Year", "Semester", "Term_Census_Date"]
+            pl.DataFrame(
+                terms.select(
+                    ["Term_ID", "Term_Reporting_Year", "Semester", "Term_Census_Date"]
+                )
             ),
             on="Term_ID",
             how="inner",
@@ -262,10 +218,6 @@ def term_enrollment(
                 (pl.col("Semester") == "FA")
                 & (pl.col("EffectiveDatetime") <= pl.col("Oct15"))
             ),
-            # Keep_FAdt=(
-            #     (pl.col("Semester") == "FA")
-            #     & (pl.col("EffectiveDatetime") <= pl.col("Oct15dt"))
-            # ),
             Keep_NF=(pl.col("Semester") != "FA"),
         )
         .filter(pl.col("Keep_FA") | pl.col("Keep_NF"))
@@ -386,7 +338,7 @@ def term_enrollment(
             how="inner",
         )
         .join(
-            terms.select(["Term_ID", "Term_Reporting_Year", "Semester"]),
+            pl.DataFrame(terms.select(["Term_ID", "Term_Reporting_Year", "Semester"])),
             on=["Term_ID", "Term_Reporting_Year", "Semester"],
             how="inner",
         )
@@ -409,7 +361,7 @@ def term_enrollment(
     # Take term load table and reduce to the reporting terms
     #
     sac_load_by_term = sac_load_by_term.join(
-        reporting_terms.select(["Term_ID", "Term_Reporting_Year"]),
+        pl.DataFrame(reporting_terms.select(["Term_ID", "Term_Reporting_Year"])),
         on=["Term_ID", "Term_Reporting_Year"],
         how="inner",
     )
@@ -488,13 +440,20 @@ def credential_seekers(
     )
 
     # Get only CU programs from ACAD_PROGRAMS
-    acad_programs = lconn.get_data(
-        "ACAD_PROGRAMS",
-        cols={"ACAD.PROGRAMS.ID": "Program"},
-        where="[ACPG.ACAD.LEVEL] == 'CU'",
+    acad_programs = pl.DataFrame(
+        lconn.get_data(
+            "ACAD_PROGRAMS",
+            cols={"ACAD.PROGRAMS.ID": "Program"},
+            where="[ACPG.ACAD.LEVEL] == 'CU'",
+        )
     )
 
-    students_stu_types = pl.LazyFrame(
+    # Get earliest start date from the reporting terms as YYYY-MM-DD
+    report_term_start_date = (
+        reporting_terms.select("Term_Census_Date").min().rows()[0][0]
+    ).strftime("%Y-%m-%d")
+
+    hs_students__all = pl.DataFrame(
         lconn.get_data(
             "STUDENTS__STU_TYPES",
             version="history",
@@ -503,53 +462,55 @@ def credential_seekers(
                 "STU.TYPES": "Student_Type",
                 "STU.TYPE.DATES": "Student_Type_Date",
                 "STU.TYPE.END.DATES": "Student_Type_End_Date",
-                "CurrentFlag": "CurrentFlag",
-                "EffectiveDatetime": "EffectiveDatetime",
             },
-        ).cast(
-            {
-                "Student_Type_Date": pl.Date,
-                "Student_Type_End_Date": pl.Date,
-                "EffectiveDatetime": pl.Datetime,
-            }
+            where=f"""
+                [STU.TYPES] IN ['HUSK','DUAL','CCPP','ECOL']
+                AND [STU.TYPE.END.DATES] >= '{report_term_start_date}' 
+            """,
+            # debug="query",
         )
+    ).cast(
+        {
+            "Student_Type_Date": pl.Date,
+            "Student_Type_End_Date": pl.Date,
+        }
     )
 
-    students = (
-        students_stu_types.filter(
-            pl.col("CurrentFlag") == "Y",
-        )
-        .select(["Person_ID", "EffectiveDatetime"])
-        .unique()
-        .join(
-            students_stu_types.filter(
-                pl.col("Student_Type").is_in(["HUSK", "DUAL", "CCPP", "ECOL"]),
-            ),
-            on=["Person_ID", "EffectiveDatetime"],
-            how="inner",
-        )
-        .drop(["EffectiveDatetime"])
-    )
+    hs_students = ddb.sql(
+        """
+        SELECT DISTINCT 
+               hs.Person_ID
+             , hs.Student_Type
+             , rt.Term_ID
+        FROM hs_students__all hs
+        CROSS JOIN (SELECT Term_ID, Term_Census_Date FROM reporting_terms) rt
+        WHERE hs.Student_Type_Date <= rt.Term_Census_Date
+        AND hs.Student_Type_End_Date >= rt.Term_Census_Date
+        ORDER BY hs.Person_ID, rt.Term_ID
+        """
+    ).pl()
 
     #
     # Get program dates (this is a multi-valued field that needs to be joined with full table).
     #
     student_programs__dates = (
-        lconn.get_data(
-            "STUDENT_PROGRAMS__STPR_DATES",
-            version="history",
-            cols={
-                "STPR.STUDENT": "Person_ID",
-                "STPR.ACAD.PROGRAM": "Program",
-                "STPR.START.DATE": "Program_Start_Date",
-                "STPR.END.DATE": "Program_End_Date",
-                "EffectiveDatetime": "EffectiveDatetime",
-            },
+        pl.DataFrame(
+            lconn.get_data(
+                "STUDENT_PROGRAMS__STPR_DATES",
+                version="history",
+                cols={
+                    "STPR.STUDENT": "Person_ID",
+                    "STPR.ACAD.PROGRAM": "Program",
+                    "STPR.START.DATE": "Program_Start_Date",
+                    "STPR.END.DATE": "Program_End_Date",
+                    # "EffectiveDatetime": "EffectiveDatetime",
+                },
+            )
         )
         .with_columns(
             Program_Start_Date=pl.col("Program_Start_Date").cast(pl.Date),
             Program_End_Date=pl.col("Program_End_Date").cast(pl.Date),
-            EffectiveDatetime=pl.col("EffectiveDatetime").cast(pl.Date),
+            # EffectiveDatetime=pl.col("EffectiveDatetime").cast(pl.Date),
         )
         .join(
             acad_programs,
@@ -559,42 +520,35 @@ def credential_seekers(
         .with_columns(
             Program_End_Date=pl.col("Program_End_Date").fill_null(pl.date(9999, 12, 31))
         )
+        .unique()
     )
 
-    if exclude_hs:
-        student_programs__dates = student_programs__dates.join(
-            high_school_programs,
-            on=["Program"],
-            how="anti",
-        )
+    # if exclude_hs:
+    #     student_programs__dates = student_programs__dates.join(
+    #         hs_students_ids,
+    #         on=["Person_ID"],
+    #         how="anti",
+    #     )
 
     #
     # Credential-seekers are those in A, D, or C programs
     #
     credential_seeking = (
-        lconn.get_data(
-            "STUDENT_PROGRAMS__STPR_DATES",
-            cols={
-                "STPR.STUDENT": "Person_ID",
-                "STPR.ACAD.PROGRAM": "Program",
-                "EffectiveDatetime": "EffectiveDatetime",
-            },
-        )
-        .unique()
-        .with_columns(
-            EffectiveDatetime=pl.col("EffectiveDatetime").cast(pl.Date),
-        )
-        .join(
-            acad_programs,
-            on="Program",
-            how="inner",
-        )
-        .join(
-            student_programs__dates,
-            on=["Person_ID", "Program", "EffectiveDatetime"],
-            how="inner",
-        )
-        .drop("EffectiveDatetime")
+        student_programs__dates
+        # .with_columns(
+        #     EffectiveDatetime=pl.col("EffectiveDatetime").cast(pl.Date),
+        # )
+        # .join(
+        #     acad_programs,
+        #     on="Program",
+        #     how="inner",
+        # )
+        # .join(
+        #     student_programs__dates,
+        #     on=["Person_ID", "Program", "EffectiveDatetime"],
+        #     how="inner",
+        # )
+        # .drop("EffectiveDatetime")
         # Identify credential seekers.
         .with_columns(
             Credential_Seeker=pl.when(
@@ -605,8 +559,10 @@ def credential_seekers(
         )
         # Cross join with terms to get all the terms they were enrolled in this credential program.
         .join(
-            terms.select(
-                ["Term_ID", "Term_Start_Date", "Term_Census_Date", "Term_End_Date"]
+            pl.DataFrame(
+                terms.select(
+                    ["Term_ID", "Term_Start_Date", "Term_Census_Date", "Term_End_Date"]
+                )
             ),
             how="cross",
         )
@@ -615,21 +571,20 @@ def credential_seekers(
             pl.col("Program_End_Date") >= pl.col("Term_Census_Date"),
             pl.col("Credential_Seeker") > 0,
         )
-        .lazy()
         .join(
-            students,
-            on=["Person_ID"],
+            pl.DataFrame(reporting_terms.select(["Term_ID"])),
+            on=["Term_ID"],
+            how="inner",
+        )
+        .join(
+            hs_students,
+            on=["Person_ID", "Term_ID"],
             how="left",
         )
         .with_columns(
-            hs_student=(
-                (pl.col("Student_Type_Date") <= pl.col("Term_Census_Date"))
-                & (pl.col("Student_Type_End_Date") >= pl.col("Term_Census_Date"))
-            ).fill_null(False)
+            hs_student=(pl.col("Student_Type").fill_null("") != ""),
         )
-        .filter(
-            ((exclude_hs & (pl.col("hs_student") is False)) | (exclude_hs is False))
-        )
+        .filter((exclude_hs & ~pl.col("hs_student")) | (exclude_hs is False))
         .select(
             [
                 "Person_ID",
@@ -638,12 +593,7 @@ def credential_seekers(
             ]
         )
         .unique()
-        .collect()
-        .join(
-            reporting_terms.select(["Term_ID"]),
-            on=["Term_ID"],
-            how="inner",
-        )
+        # .collect()
     )
 
     if conn.df_format == "pandas":
@@ -849,7 +799,7 @@ def ipeds_cohort(
 if __name__ == "__main__":
     import time
 
-    report_semesters = ["FA", "SP"]
+    report_semesters = ["FA", "SP", "SU"]
     report_years = [2020, 2021, 2022]
 
     conn_pd = ColleagueConnection(
@@ -868,14 +818,27 @@ if __name__ == "__main__":
         lazy=True,
     )
 
-    df = load_data("ccp_programs", "pandas")
-    df = load_data("ccp_programs", "polars")
-    df = load_data("ccp_programs", "polars", True)
+    # df = load_data("ccp_programs", "pandas")
+    # df = load_data("ccp_programs", "polars")
+    # df = load_data("ccp_programs", "polars", True)
 
     total_start_time = time.time()
 
     print(f"report_years: {report_years}")
     print(f"report_semesters: {report_semesters}")
+
+    # credential_seekers
+    start_time = time.time()
+    df_pd = credential_seekers(
+        conn_pd,
+        report_years=report_years,
+        report_semesters=report_semesters,
+        exclude_hs=True,
+    )
+    elapsed_time = time.time() - start_time
+    print(
+        f"   ...[{elapsed_time:.2f} secs] shape: {df_pd.shape}, terms: {df_pd['Term_ID'].unique().tolist()}"
+    )
 
     ### term_enrollment
     print("Run term_enrollment with format=pandas, lazy=False")
